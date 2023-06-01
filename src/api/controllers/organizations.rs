@@ -1,4 +1,4 @@
-use crate::models::{NewOrganization, Organization};
+use crate::models::{File, NewFile, NewOrganization, Organization};
 use crate::DbPool;
 
 use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
@@ -6,6 +6,8 @@ use chrono::Utc;
 use diesel::prelude::*;
 
 // TODO: ERRORS NEED TO PROPOGATE THROUGH web::block CALLS FOR PROPER HttpResponse STATUS CODE.
+
+// These functions are scoped to /organizations
 
 #[get("")]
 pub async fn get_organizations(pool: web::Data<DbPool>) -> impl Responder {
@@ -33,7 +35,7 @@ pub async fn get_organization(
     pool: web::Data<DbPool>,
     path: web::Path<(String,)>,
 ) -> impl Responder {
-    let (organization_id,): (String,) = path.into_inner();
+    let (organization_id,) = path.into_inner();
     let organization_uuid = uuid::Uuid::parse_str(&organization_id);
 
     if let Err(_) = organization_uuid {
@@ -78,7 +80,9 @@ pub async fn create_organization(
             created_at: Utc::now().naive_utc(),
         };
 
-        diesel::insert_into(crate::schema::organizations::table)
+        use crate::schema::organizations::dsl::organizations;
+
+        diesel::insert_into(organizations)
             .values(&new_organization)
             .get_result::<Organization>(connection)
             .expect("Error creating organization")
@@ -97,7 +101,7 @@ pub async fn update_organization(
     json: web::Json<NewOrganization>,
     path: web::Path<(String,)>,
 ) -> impl Responder {
-    let (organization_id,): (String,) = path.into_inner();
+    let (organization_id,) = path.into_inner();
     let organization_uuid = uuid::Uuid::parse_str(&organization_id);
 
     if let Err(_) = organization_uuid {
@@ -133,7 +137,7 @@ pub async fn delete_organization(
     pool: web::Data<DbPool>,
     path: web::Path<(String,)>,
 ) -> impl Responder {
-    let (organization_id,): (String,) = path.into_inner();
+    let (organization_id,) = path.into_inner();
     let organization_uuid = uuid::Uuid::parse_str(&organization_id);
 
     if let Err(_) = organization_uuid {
@@ -159,4 +163,111 @@ pub async fn delete_organization(
         Ok(organization) => HttpResponse::Ok().json(organization),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
+}
+
+// These functions are scoped to /organizations/{organization_id}/files
+
+#[get("")]
+pub async fn get_organization_files(
+    pool: web::Data<DbPool>,
+    path: web::Path<(String,)>,
+) -> impl Responder {
+    let (organization_id,) = path.into_inner();
+    let organization_uuid = uuid::Uuid::parse_str(&organization_id);
+    drop(organization_id);
+
+    if let Err(_) = organization_uuid {
+        return HttpResponse::BadRequest().finish();
+    }
+
+    let organization_uuid = organization_uuid.unwrap();
+
+    let get_organization_files_result = web::block(move || {
+        let connection = &mut pool
+            .get()
+            .expect("Couldn't get database connection from pool");
+
+        use crate::schema::files::dsl::{files, organization_id};
+
+        files
+            .filter(organization_id.eq(organization_uuid))
+            .load::<File>(connection)
+            .expect("Error fetching files") as Vec<File>
+    })
+    .await;
+
+    match get_organization_files_result {
+        Ok(files) => HttpResponse::Ok().json(files),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+#[get("/{file_id}")]
+pub async fn get_organization_file(
+    pool: web::Data<DbPool>,
+    path: web::Path<(String, String)>,
+) -> impl Responder {
+    dbg!(&path.into_inner());
+    HttpResponse::NotImplemented().finish()
+}
+
+#[post("")]
+pub async fn create_organization_file(
+    pool: web::Data<DbPool>,
+    path: web::Path<(String,)>,
+    json: web::Json<NewFile>,
+) -> impl Responder {
+    let (organization_id,) = path.into_inner();
+    let organization_uuid = uuid::Uuid::parse_str(&organization_id);
+    drop(organization_id);
+
+    if let Err(_) = organization_uuid {
+        return HttpResponse::BadRequest().finish();
+    }
+
+    let organization_uuid = organization_uuid.unwrap();
+
+    let create_organization_file_result = web::block(move || {
+        let connection = &mut pool
+            .get()
+            .expect("Couldn't get database connection from pool");
+
+        use crate::schema::files::dsl::files;
+
+        let new_file: File = File {
+            id: uuid::Uuid::new_v4(),
+            name: json.into_inner().name,
+            organization_id: organization_uuid,
+            created_at: Utc::now().naive_utc(),
+        };
+
+        diesel::insert_into(files)
+            .values(new_file)
+            .get_result::<File>(connection)
+            .expect("Error creating file")
+    })
+    .await;
+
+    match create_organization_file_result {
+        Ok(file) => HttpResponse::Ok().json(file),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
+
+#[put("/{file_id}")]
+pub async fn update_organization_file(
+    pool: web::Data<DbPool>,
+    path: web::Path<(String, String)>,
+) -> impl Responder {
+    dbg!(&path.into_inner());
+    HttpResponse::NotImplemented().finish()
+}
+
+#[delete("/{file_id}")]
+pub async fn delete_organization_file(
+    pool: web::Data<DbPool>,
+    path: web::Path<(String, String)>,
+) -> impl Responder {
+    dbg!(&path.into_inner());
+    HttpResponse::NotImplemented().finish()
 }

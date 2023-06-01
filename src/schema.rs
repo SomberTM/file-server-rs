@@ -2,7 +2,7 @@
 
 diesel::table! {
     files (id) {
-        id -> Int4,
+        id -> Uuid,
         name -> Varchar,
         created_at -> Timestamp,
         organization_id -> Uuid,
