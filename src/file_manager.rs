@@ -11,6 +11,8 @@ use crate::models::File;
 pub struct FileManager;
 
 impl FileManager {
+    const MAX_FILE_COUNT: i32 = 10;
+
     fn get_filestore_dir() -> Result<String, VarError> {
         dotenv().ok();
         env::var("LOCAL_FILESTORE_DIR")
@@ -58,7 +60,7 @@ impl FileManager {
         let mut files: Vec<File> = Vec::new();
 
         while let Some(item) = payload.next().await {
-            if file_count >= 3 {
+            if file_count >= Self::MAX_FILE_COUNT {
                 break;
             }
 
