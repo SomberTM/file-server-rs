@@ -23,7 +23,7 @@ async fn main() -> io::Result<()> {
         .build(manager)
         .expect("DATABASE_URL should be a valid PostgreSQL connection string");
 
-    use api::controllers;
+    use api::routes;
 
     // Not sure how much I like the nested scopes like this.
     // It works for now but there is probably a simpler/more
@@ -39,15 +39,15 @@ async fn main() -> io::Result<()> {
             )
             .service(
                 web::scope("/organizations")
-                    .service(controllers::organizations::get_organization)
-                    .service(controllers::organizations::get_organizations)
-                    .service(controllers::organizations::create_organization)
-                    .service(controllers::organizations::update_organization)
-                    .service(controllers::organizations::delete_organization)
+                    .service(routes::organizations::get_organization)
+                    .service(routes::organizations::get_organizations)
+                    .service(routes::organizations::create_organization)
+                    .service(routes::organizations::update_organization)
+                    .service(routes::organizations::delete_organization)
                     .service(
                         web::scope("/{organization_id}/files")
-                            .service(controllers::organizations::get_organization_files)
-                            .service(controllers::organizations::upload_organization_files),
+                            .service(routes::organizations::get_organization_files)
+                            .service(routes::organizations::upload_organization_files),
                     ),
             )
             .service(
