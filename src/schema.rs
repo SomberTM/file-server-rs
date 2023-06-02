@@ -5,6 +5,7 @@ diesel::table! {
         id -> Uuid,
         name -> Varchar,
         created_at -> Timestamp,
+        url -> Varchar,
         organization_id -> Uuid,
     }
 }

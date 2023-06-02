@@ -1,3 +1,4 @@
+use crate::file_manager::FileManager;
 use crate::models::{File, NewFile, NewOrganization, Organization};
 use crate::DbPool;
 
@@ -6,6 +7,7 @@ use chrono::Utc;
 use diesel::prelude::*;
 
 // TODO: ERRORS NEED TO PROPOGATE THROUGH web::block CALLS FOR PROPER HttpResponse STATUS CODE.
+// TODO: CLEANUP FILEMANAGER AND UPLOAD FILES FUNCTIOn
 
 // These functions are scoped to /organizations
 
@@ -191,7 +193,7 @@ pub async fn get_organization_files(
 
         files
             .filter(organization_id.eq(organization_uuid))
-            .load::<File>(connection)
+            .load(connection)
             .expect("Error fetching files") as Vec<File>
     })
     .await;
@@ -211,21 +213,25 @@ pub async fn get_organization_file(
     HttpResponse::NotImplemented().finish()
 }
 
+use actix_multipart::Multipart;
+
 #[post("")]
-pub async fn create_organization_file(
+pub async fn upload_organization_files(
+    payload: Multipart,
     pool: web::Data<DbPool>,
     path: web::Path<(String,)>,
-    json: web::Json<NewFile>,
 ) -> impl Responder {
     let (organization_id,) = path.into_inner();
     let organization_uuid = uuid::Uuid::parse_str(&organization_id);
     drop(organization_id);
 
-    if let Err(_) = organization_uuid {
+    if let Err(err) = organization_uuid {
+        eprintln!("{}", err);
         return HttpResponse::BadRequest().finish();
     }
 
     let organization_uuid = organization_uuid.unwrap();
+    let new_files = FileManager::create_files_from_multipart(organization_uuid, payload).await;
 
     let create_organization_file_result = web::block(move || {
         let connection = &mut pool
@@ -234,22 +240,20 @@ pub async fn create_organization_file(
 
         use crate::schema::files::dsl::files;
 
-        let new_file: File = File {
-            id: uuid::Uuid::new_v4(),
-            name: json.into_inner().name,
-            organization_id: organization_uuid,
-            created_at: Utc::now().naive_utc(),
-        };
-
         diesel::insert_into(files)
-            .values(new_file)
-            .get_result::<File>(connection)
+            .values(&new_files)
+            .get_results::<File>(connection)
             .expect("Error creating file")
     })
     .await;
 
     match create_organization_file_result {
-        Ok(file) => HttpResponse::Ok().json(file),
+        Ok(files) => HttpResponse::Ok().json(
+            files
+                .into_iter()
+                .map(|file| file.url)
+                .collect::<Vec<String>>(),
+        ),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }

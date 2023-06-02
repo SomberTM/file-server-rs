@@ -6,8 +6,9 @@ CREATE TABLE organizations (
 );
 
 CREATE TABLE files (
-    id SERIAL PRIMARY KEY,
+    id uuid PRIMARY KEY,
     name VARCHAR NOT NULL,
     created_at TIMESTAMP NOT NULL,
+    url VARCHAR NOT NULL,
     organization_id uuid NOT NULL REFERENCES organizations (id) ON DELETE CASCADE
 );

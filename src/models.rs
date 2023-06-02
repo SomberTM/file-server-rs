@@ -26,10 +26,11 @@ pub struct File {
     pub id: uuid::Uuid,
     pub name: String,
     pub created_at: NaiveDateTime,
+    pub url: String,
     pub organization_id: uuid::Uuid,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct NewFile {
     pub name: String,
 }

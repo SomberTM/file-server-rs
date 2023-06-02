@@ -1,7 +1,9 @@
 pub mod api;
+pub mod file_manager;
 pub mod models;
 pub mod schema;
 
+use actix_cors::Cors;
 use actix_files::Files;
 use actix_web::{web, App, HttpServer};
 use diesel::{r2d2, PgConnection};
@@ -29,6 +31,11 @@ async fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
+            .wrap(
+                Cors::default()
+                    .allowed_origin_fn(|_, _| true)
+                    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"]),
+            )
             .service(
                 web::scope("/organizations")
                     .service(controllers::organizations::get_organization)
@@ -39,7 +46,7 @@ async fn main() -> io::Result<()> {
                     .service(
                         web::scope("/{organization_id}/files")
                             .service(controllers::organizations::get_organization_files)
-                            .service(controllers::organizations::create_organization_file),
+                            .service(controllers::organizations::upload_organization_files),
                     ),
             )
             .service(Files::new("/fileserver", "./filestore/").prefer_utf8(true))
