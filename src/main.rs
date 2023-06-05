@@ -12,11 +12,22 @@ use std::{env, io};
 
 pub type DbPool = r2d2::Pool<r2d2::ConnectionManager<PgConnection>>;
 
+pub fn ensure_required_env_variables() {
+    dotenv().ok();
+    env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env");
+    env::var("LOCAL_FILESTORE_DIR").expect("LOCAL_FILESTORE_DIR must be set in .env");
+    env::var("SERVER_DOMAIN").expect("SERVER_DOMAIN must be set in .env");
+    env::var("MAX_FILE_UPLOAD_COUNT")
+        .expect("MAX_FILE_UPLOAD_COUNT must be set in .env")
+        .parse::<i32>()
+        .expect("MAX_FILE_UPLOAD_COUNT must be an integer");
+}
+
 #[actix_web::main]
 async fn main() -> io::Result<()> {
-    dotenv().ok();
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let filestore_dir = env::var("LOCAL_FILESTORE_DIR").expect("LOCAL_FILESTORE_DIR must be set");
+    ensure_required_env_variables();
+    let database_url = env::var("DATABASE_URL").unwrap();
+    let filestore_dir = env::var("LOCAL_FILESTORE_DIR").unwrap();
 
     let manager = r2d2::ConnectionManager::<PgConnection>::new(database_url);
     let pool = r2d2::Pool::builder()
@@ -50,9 +61,7 @@ async fn main() -> io::Result<()> {
                             .service(routes::organizations::upload_organization_files),
                     ),
             )
-            .service(
-                Files::new("/fileserver", format!("{}/", filestore_dir.clone())).prefer_utf8(true),
-            )
+            .service(Files::new("/", format!("{}/", filestore_dir.clone())).prefer_utf8(true))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
